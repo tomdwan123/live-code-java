@@ -4,11 +4,14 @@
 package epam;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Queue;
 import java.util.Set;
 
 public class Interview {
@@ -24,7 +27,13 @@ public class Interview {
     //longestPalindrome("babad");
     //isValid("()[]{}");
     String[] input = {"AD-RO", "ME-BE", "RO-ME"};
-    order(input);
+    //order(input);
+
+    int[] number1s = {0, 1, 0, 3, 80, 78};
+    int[] number2s = {1, 2, 3};
+    int[] number3s = {0, 0, 0};
+    int[] number4s = {0, 0, 9};
+    System.out.println("After: " + shiftZero2(number1s));
   }
 
   private static int solution(String s) {
@@ -286,5 +295,75 @@ public class Interview {
     }
 
     return result;
+  }
+
+  /*
+  Algorithms: Shift zero
+    1. Problem Statement
+    Given an integer array nums, move all 0 to the end of it while maintaining the relative order of the non-zero elements.
+
+    2.1 Input Specifications
+    Data Type: An array of integers (nums).Constraints:The array can contain positive integers, negative integers, and zeros.
+    The array length $n$ is bounded by 0 <= n <= 10^4
+
+    2.2 Output Specifications
+    Return Value: The same array modified in-place, or void depending on the language paradigm.
+
+    Time ComplexityTarget: Linear Time, $O(n)
+
+    Target: In-Place, $O(1)$ Auxiliary Space
+    [0, 1, 0, 3, 80, 78] > [1, 3, 80, 78, 0, 0]
+    [1, 2, 3]			> [1, 2, 3]
+    [0, 0, 0]			> [0, 0, 0]
+    [0, 0, 9]			> [9, 0, 0]
+   */
+  private static Object[] shiftZero(int[] numbers) {
+
+    int sizeNumber = numbers.length;
+    Queue<Integer> queue = new LinkedList<>();
+    for (int i = 0; i < sizeNumber; i++) {
+      if (numbers[i] != 0) {
+        queue.add(numbers[i]);
+      }
+    }
+
+    /*
+    queue:[1.3.80.78]
+
+     */
+    while (queue.size() < sizeNumber) {
+      queue.add(0);
+    }
+
+    ArrayList<Object> result = new ArrayList<>();
+    queue.stream().forEach(n -> result.add(n));
+
+    System.out.println("After array shift zero is: " + result);
+    return result.toArray();
+  }
+
+  private static int[] shiftZero2(int[] numbers) {
+
+    // todo
+    int size = numbers.length;
+    for (int i = 0; i < size; i++) {
+      if (numbers[i] == 0) {
+        //swap(numbers, i, size - count - 1);
+
+      }
+    }
+
+    System.out.println("after shift zero: " + Arrays.toString(numbers));
+    return numbers;
+  }
+
+private static void shiftZeroHelper(int[] number, int index) {
+
+}
+
+  private static void swap(int[] numbers, int left, int right) {
+    int temp = numbers[left];
+    numbers[left] = numbers[right];
+    numbers[right] = temp;
   }
 }
