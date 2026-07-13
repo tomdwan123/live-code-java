@@ -13,6 +13,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class ThreadTest {
 
@@ -27,6 +30,10 @@ public class ThreadTest {
     //initCompletableFutureWithTimeout();
     //initCompletableFutureWithCustomThreadPoolExecutor();
     //initCompletableFutureWithRealMicroserviceAggregator();
+    //initProducerConsumer();
+    //initLock();
+    //initReentrantLock();
+    //resolveDeadlock();
 
     // 1. How do you create a deadlock scenario programmatically in Java?
 
@@ -191,6 +198,7 @@ public class ThreadTest {
     executors.shutdown();
   }
 
+
   /*
     ** Advantages
     **** Bounded queue
@@ -249,6 +257,150 @@ public class ThreadTest {
     System.out.println(dashboard);
     executor.shutdown();
   }
+  private static void initProducerConsumer() {
+    LinkedBlockingQueue<Integer> queue = new LinkedBlockingQueue<>();
+
+    Thread producer = new Thread(() -> {
+      for (int i = 1 ; i < 10; i++) {
+        try {
+          sleep(2000);
+          queue.put(i);
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+      }
+    });
+
+    Thread consumer = new Thread(() -> {
+      while (true) {
+        try {
+          System.out.println(queue.poll(5, TimeUnit.SECONDS)); // No BLOCK thread, return null if queue is empty
+          System.out.println("Timeout!");
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+      }
+
+      /*while (true) {
+        try {
+          //System.out.println(queue.take()); // BLOCK the thread until another thread inserts an element
+        } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+        }
+      }*/
+    });
+
+    producer.start();
+    consumer.start();
+  }
+
+  private static void initLock() {
+
+    WaitNotification waitNotification = new WaitNotification();
+
+    new Thread(() -> {
+      try {
+        waitNotification.printA();
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }).start();
+
+    new Thread(() -> {
+      try {
+        waitNotification.printB();
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }).start();
+
+    new Thread(() -> {
+      try {
+        waitNotification.printC();
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }).start();
+  }
+
+  private static void initReentrantLock() {
+
+    ConditionLockNotification lock = new ConditionLockNotification();
+
+    new Thread(() -> {
+      try {
+        lock.printA();
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }).start();
+
+    new Thread(() -> {
+      try {
+        lock.printB();
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }).start();
+
+    new Thread(() -> {
+      try {
+        lock.printC();
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }).start();
+  }
+
+  private static void resolveDeadlock() {
+
+    ReentrantLock lockA = new ReentrantLock();
+    ReentrantLock lockB = new ReentrantLock();
+
+    new Thread(() -> {
+      while (true) {
+
+        if (lockA.tryLock()) {
+          try {
+            if (lockB.tryLock()) {
+              try {
+                System.out.println("t1 is working");
+                break;
+              } finally {
+                lockB.unlock();
+              }
+            }
+          } finally {
+            lockA.unlock();
+          }
+        }
+
+        Thread.yield();
+      }
+    }).start();
+
+    new Thread(() -> {
+      while (true) {
+
+        if (lockA.tryLock()) {
+          try {
+            if (lockB.tryLock()) {
+              try {
+                System.out.println("t2 is working");
+                break;
+              } finally {
+                lockB.unlock();
+              }
+            }
+          } finally {
+            lockA.unlock();
+          }
+        }
+
+        Thread.yield();
+      }
+    }).start();
+  }
 }
 
 record User1(String name) {}
@@ -262,3 +414,128 @@ record Dashboard(
     Order1 order,
     Payment1 payment1
 ) {}
+
+class Counter {
+  private final AtomicInteger count = new AtomicInteger();
+
+  void increment() {
+    count.incrementAndGet();
+  }
+
+  int get() {
+    return count.get();
+  }
+}
+
+class WaitNotification {
+  private final Object lock = new Object();
+  private int state = 0;
+  private final int retry = 3;
+
+  public void printA() throws InterruptedException {
+
+    for (int i = 1; i <= retry; i++) {
+      synchronized (lock) {
+        while (state != 0) {
+          lock.wait();
+        }
+
+        System.out.println("A --- Round " + i + " --- " + Thread.currentThread().getName());
+        state = 1;
+        lock.notifyAll();
+      }
+    }
+  }
+
+  public void printB() throws InterruptedException {
+
+    for (int i = 1; i <= retry; i++) {
+      synchronized (lock) {
+        while (state != 1) {
+          lock.wait();
+        }
+
+        System.out.println("B --- Round " + i + " --- " + Thread.currentThread().getName());
+        state = 2;
+        lock.notifyAll();
+      }
+    }
+  }
+
+  public void printC() throws InterruptedException {
+
+    for (int i = 1; i <= retry; i++) {
+      synchronized (lock) {
+        while (state != 2) {
+          lock.wait();
+        }
+
+        System.out.println("C --- Round " + i + " --- " + Thread.currentThread().getName());
+        state = 0;
+        lock.notifyAll();
+      }
+    }
+  }
+}
+
+class ConditionLockNotification {
+
+  private final ReentrantLock lock = new ReentrantLock();
+  private final Condition condition = lock.newCondition();
+  private int state = 0;
+  private final int retry = 3;
+
+  void printA() throws InterruptedException {
+
+      for (int i = 1; i <= retry; i++) {
+        lock.lock();
+        try {
+            while (state != 0) {
+              condition.await();
+            }
+
+            System.out.println("A --- Round " + i + " --- " + Thread.currentThread().getName());
+            state = 1;
+            condition.signalAll();
+        } finally {
+          lock.unlock();
+        }
+      }
+  }
+
+  void printB() throws InterruptedException {
+
+    for (int i = 1; i <= retry; i++) {
+      lock.lock();
+      try {
+        while (state != 1) {
+          condition.await();
+        }
+
+        System.out.println("B --- Round " + i + " --- " + Thread.currentThread().getName());
+        state = 2;
+        condition.signalAll();
+      } finally {
+        lock.unlock();
+      }
+    }
+  }
+
+  void printC() throws InterruptedException {
+
+    for (int i = 1; i <= retry; i++) {
+      lock.lock();
+      try {
+        while (state != 2) {
+          condition.await();
+        }
+
+        System.out.println("C --- Round " + i + " --- " + Thread.currentThread().getName());
+        state = 0;
+        condition.signalAll();
+      } finally {
+        lock.unlock();
+      }
+    }
+  }
+}
